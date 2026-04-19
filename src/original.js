@@ -1,4 +1,7 @@
+
+
 const CONFIG = {
+    
     /**Supported Events*/
     SupportedEvents:
         /**@type{const}*/ ([
@@ -7,13 +10,14 @@ const CONFIG = {
     /**Times to try. Do not set below 1 or else it wont work.*/
     EventTries: 1,
     /**Whether to turn on Experimental retries.*/
-    ExperimentalRetries: false
+    ExperimentalRetries:true,
+    /**What to do when code gets retried. @type{"RetryFn"|"NextFn"}*/
+    OnRetryPolicy: "NextFn"
 };
 
-let _ = {}; for (let e = 0; e <  CONFIG.SupportedEvents.length; e++)_[CONFIG.SupportedEvents[e]] = [];
+let _ = {}; for (let e = 0; e < CONFIG.SupportedEvents.length; e++)_[CONFIG.SupportedEvents[e]] = [];
 /**@type{Record<typeof CONFIG["SupportedEvents"][number],Function[]>}*/
 let Events = _;
-
 
 const EventsManager = {
     /**
@@ -24,37 +28,47 @@ const EventsManager = {
     register(name, callback) {
         Events[name].push(callback);
     },
-/** @param {typeof CONFIG["SupportedEvents"][number]} name */
-    __startFor(name) {
-        globalThis[name] = (...args) => {
-            const currentEvents = Events[name];
-            
-            for (let i = 0; i < currentEvents.length; i++) {
-                const fn = currentEvents[i];
-                let retried = 1;
+    
+    __runFor(name, index = 0, args) {
+        const currentEvents = Events[name];
+        if (index >= currentEvents.length) return;
 
-                if(CONFIG["ExperimentalRetries"])Object.defineProperty(globalThis.InternalError.prototype, "name", {
+        for (let i = index; i < currentEvents.length; i++) {
+            const fn = currentEvents[i];
+            let retried = 0;
+
+            if (CONFIG["ExperimentalRetries"]) {
+                Object.defineProperty(globalThis.InternalError.prototype, "name", {
                     configurable: true,
                     get: () => {
-                        if (++retried > CONFIG["EventRetries"]) {
-                            api.broadcastMessage(`Error at ${name}: Too many retries!`, {color: "#ff9d87"});
+                        if (CONFIG["OnRetryPolicy"] === "NextFn") {
+                            this.__runFor(name, i + 1, args);
+                            return
+                        }
+
+                        if (++retried > CONFIG["EventRetries"] && CONFIG["OnRetryPolicy"] === "RetryFn") {
+                            api.broadcastMessage(`[LOOM] Max retries hit at ${name}`, { color: "#ff9d87" });
                         } else {
                             fn(...args);
                         }
                     }
                 });
-
-                if (retried > CONFIG["EventRetries"] && CONFIG["ExperimentalRetries"]) {
-                    api.broadcastMessage(`Error at ${name}: Too many retries!`, {color: "#ff9d87"});
-                    return;
-                }
-
-                try {
-                    fn(...args);
-                } catch (err) {
-                    api.broadcastMessage(`Error at ${name}: ${err}`, {color: "#ff9d87"});
-                }
             }
+
+            try {
+                fn(...args);
+            } catch (err) {
+                if (err.message === "LOOM_SKIP") return;
+
+                api.broadcastMessage(`[LOOM] Error at ${name}: ${err}`, { color: "#ff9d87" });
+                if (CONFIG["OnRetryPolicy"] === "NextFn") continue;
+            }
+        }
+    },
+    /** @param {typeof CONFIG["SupportedEvents"][number]} name*/
+    __startFor(name) {
+        globalThis[name] = (...args) => {
+            this.__runFor(name, 0, args);
         };
     },
     startAll() {
@@ -64,12 +78,12 @@ const EventsManager = {
     }
 };
 
-globalThis.LOOM = function() {
-    let newGlobalThis = {...globalThis}
+globalThis.LOOM = function () {
+    let newGlobalThis = { ...globalThis };
     for (let i = 0; i < CONFIG["SupportedEvents"].length; i++) {
         const eventName = CONFIG["SupportedEvents"][i];
         let internalValue;
-        
+
         Object.defineProperty(newGlobalThis, eventName, {
             configurable: true,
             set: (value) => {
@@ -79,6 +93,6 @@ globalThis.LOOM = function() {
             get: () => internalValue
         });
     }
-    return newGlobalThis
-}
-EventsManager.startAll()
+    return newGlobalThis;
+};
+EventsManager.startAll();
