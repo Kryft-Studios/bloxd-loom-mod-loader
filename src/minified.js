@@ -5,7 +5,7 @@ SupportedEvents:
 /**Times to try. Do not set below 1 or else it wont work.*/
 EventTries:1,
 /**Whether to turn on Experimental retries.*/
-ExperimentalRetries:!1,
+ExperimentalRetries:!0,
 /**What to do when code gets retried. @type{"RetryFn"|"NextFn"}*/
 OnRetryPolicy:"NextFn"};let _={};for(let t=0;t<CONFIG.SupportedEvents.length;t++)_[CONFIG.SupportedEvents[t]]=[];
 /**@type{Record<typeof CONFIG["SupportedEvents"][number],Function[]>}*/let Events=_;const EventsManager={
