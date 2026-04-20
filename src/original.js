@@ -18,7 +18,9 @@ const CONFIG = {
 let _ = {}; for (let e = 0; e < CONFIG.SupportedEvents.length; e++)_[CONFIG.SupportedEvents[e]] = [];
 /**@type{Record<typeof CONFIG["SupportedEvents"][number],Function[]>}*/
 let Events = _;
-
+/**@type{Record<number,{index:number,callback:typeof CONFIG["SupportedEvents"][number]}>}*/
+const idLookup = {}
+let idCounter = 0;
 const EventsManager = {
     /**
     * @template {typeof CONFIG["SupportedEvents"][number]} NAME
@@ -27,6 +29,17 @@ const EventsManager = {
     */
     register(name, callback) {
         Events[name].push(callback);
+        idLookup[++idCounter] = {callback:name,index:Events[name].length-1}
+        return idCounter;
+    },
+    /**@param{number} id*/
+    unregister(id){
+        if(!idLookup[id]) return; 
+        
+        const {callback: name, index} = idLookup[id];
+        Events[name][index] = null; 
+        
+       idLookup[id]=undefined;
     },
     
     __runFor(name, index = 0, args) {
