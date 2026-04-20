@@ -1,7 +1,7 @@
 const CONFIG={
 /**Supported Events*/
 SupportedEvents:
-/**@type{const}*/["tick"],
+/**@type{const}*/(["tick"]),
 /**Times to try. Do not set below 1 or else it wont work.*/
 EventTries:1,
 /**Whether to turn on Experimental retries.*/
